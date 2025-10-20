@@ -20,6 +20,7 @@ import ProtectedDealerGroupRoute from "./components/ProtectedDealerGroupRoute";
 
 // Dealer Group pages
 import DealerGroupPortal from "./pages/DealerGroupPortal";
+import DealerGroupDashboard from "./pages/DealerGroupDashboard";
 import DealerGroupInventoryStock from "./pages/DealerGroupInventoryStock";
 import DealerGroupUnsigned from "./pages/DealerGroupUnsigned";
 
@@ -48,10 +49,15 @@ const App = () => (
           <Route path="/admin-login" element={<AdminLogin />} />
           <Route path="/admin" element={<Admin />} />
 
-          {/* Dealer 上下文 - 必须带生成码，格式验证 */}
+          {/* 单个 Dealer 路由 - 使用 /dealer/ 前缀 */}
           <Route path="/dealer/:dealerSlug" element={
             <ProtectedDealerRoute>
               <DealerPortal />
+            </ProtectedDealerRoute>
+          } />
+          <Route path="/dealer/:dealerSlug/dashboard" element={
+            <ProtectedDealerRoute>
+              <DealerDashboard />
             </ProtectedDealerRoute>
           } />
           <Route path="/dealer/:dealerSlug/inventorystock" element={
@@ -64,15 +70,15 @@ const App = () => (
               <UnsignedEmptySlots />
             </ProtectedDealerRoute>
           } />
-          <Route path="/dealer/:dealerSlug/dashboard" element={
-            <ProtectedDealerRoute>
-              <DealerDashboard />
-            </ProtectedDealerRoute>
-          } />
 
-          {/* Dealer Group 路由 - 新的嵌套结构 */}
-          {/* 默认重定向到第一个dealer */}
+          {/* Dealer Group 路由 - 使用 /dealergroup/ 前缀 */}
+          {/* 不带选中dealer的路由（会自动重定向到第一个dealer） */}
           <Route path="/dealergroup/:dealerSlug/dashboard" element={
+            <ProtectedDealerGroupRoute>
+              <DealerGroupDashboard />
+            </ProtectedDealerGroupRoute>
+          } />
+          <Route path="/dealergroup/:dealerSlug/dealerorders" element={
             <ProtectedDealerGroupRoute>
               <DealerGroupPortal />
             </ProtectedDealerGroupRoute>
@@ -90,6 +96,11 @@ const App = () => (
 
           {/* 带选中dealer的路由 */}
           <Route path="/dealergroup/:dealerSlug/:selectedDealerSlug/dashboard" element={
+            <ProtectedDealerGroupRoute>
+              <DealerGroupDashboard />
+            </ProtectedDealerGroupRoute>
+          } />
+          <Route path="/dealergroup/:dealerSlug/:selectedDealerSlug/dealerorders" element={
             <ProtectedDealerGroupRoute>
               <DealerGroupPortal />
             </ProtectedDealerGroupRoute>
