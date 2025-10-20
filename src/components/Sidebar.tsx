@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Package, BarChart3, Factory, FileX } from "lucide-react";
+import { Package, BarChart3, Factory, FileX, LayoutDashboard } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { NavLink, useParams, useNavigate, useLocation } from "react-router-dom";
@@ -64,13 +64,14 @@ export default function Sidebar({
     const path = location.pathname;
     if (path.includes('/inventorystock')) return 'inventorystock';
     if (path.includes('/unsigned')) return 'unsigned';
+    if (path.includes('/dashboard')) return 'dashboard';
     return 'dashboard';
   };
 
   // 处理dealer点击 - 切换到选中的dealer并保持当前页面
-  const handleDealerClick = (dealerSlug: string) => {
+  const handleDealerClick = (newDealerSlug: string) => {
     const currentPage = getCurrentPage();
-    navigate(`/dealergroup/${dealerSlug}/${dealerSlug}/${currentPage}`);
+    navigate(`/dealergroup/${dealerSlug}/${newDealerSlug}/${currentPage}`);
   };
 
   // 导航路径 - 使用新的路由结构
@@ -81,6 +82,7 @@ export default function Sidebar({
     : "/";
     
   const navigationItems = [
+    { path: `${basePath}/dashboard`, label: "Dashboard", icon: LayoutDashboard, end: true },
     { path: `${basePath}/dashboard`, label: "Dealer Orders", icon: BarChart3, end: true },
     { path: `${basePath}/inventorystock`, label: "Factory Inventory", icon: Factory, end: true },
     { path: `${basePath}/unsigned`, label: "Unsigned & Empty Slots", icon: FileX, end: true },
