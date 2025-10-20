@@ -98,7 +98,7 @@ export default function DealerGroupPortal() {
   // 获取包含的dealer slugs（如果是分组）
   const includedDealerSlugs = useMemo(() => {
     if (!dealerConfig || !isDealerGroup(dealerConfig)) {
-      return [dealerSlug]; // 普通dealer，只包含自己
+      return [dealerSlug];
     }
     return dealerConfig.includedDealers || [];
   }, [dealerConfig, dealerSlug]);
@@ -128,23 +128,16 @@ export default function DealerGroupPortal() {
     }
   }, [configLoading, dealerConfig, selectedDealerSlug, includedDealerSlugs, rawDealerSlug, navigate]);
 
-  // 当前显示的dealer slugs（如果选中了特定dealer，只显示该dealer）
-  const displayDealerSlugs = useMemo(() => {
-    if (selectedDealerSlug) {
-      return [selectedDealerSlug];
-    }
-    return includedDealerSlugs;
-  }, [selectedDealerSlug, includedDealerSlugs]);
+  // 当前显示的dealer slug（如果选中了特定dealer，只显示该dealer）
+  const currentDealerSlug = selectedDealerSlug || includedDealerSlugs[0] || dealerSlug;
 
-  // 过滤订单：只显示当前选中dealer的订单
+  // 只展示当前选中dealer的订单
   const dealerOrders = useMemo(() => {
-    if (!dealerSlug) return [];
-    
-    return (allOrders || []).filter((o) => {
-      const orderDealerSlug = slugifyDealerName(o.Dealer);
-      return displayDealerSlugs.includes(orderDealerSlug);
-    });
-  }, [allOrders, displayDealerSlugs, dealerSlug]);
+    if (!currentDealerSlug) return [];
+    return (allOrders || []).filter(
+      (o) => slugifyDealerName(o.Dealer) === currentDealerSlug
+    );
+  }, [allOrders, currentDealerSlug]);
 
   // 过滤订单（仅 Model Range / Customer Type）
   const filteredOrders = useMemo(() => {
@@ -177,7 +170,7 @@ export default function DealerGroupPortal() {
       return fromOrder || prettifyDealerName(selectedDealerSlug);
     }
 
-    // 否则显示分组名称
+    // 否则显示分组名称或第一个dealer的名称
     if (dealerConfig?.name) return dealerConfig.name;
 
     const fromOrder = dealerOrders[0]?.Dealer;
@@ -291,7 +284,7 @@ export default function DealerGroupPortal() {
         <header className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-semibold">
-              {isDealerGroup(dealerConfig) ? "Dealer Group Portal" : "Dealer Portal"} — {dealerDisplayName}
+              Dealer Portal — {dealerDisplayName}
             </h1>
             <p className="text-muted-foreground mt-1">
               Order Tracking ({filteredOrders.length} of {dealerOrders.length} orders)
