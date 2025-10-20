@@ -113,20 +113,16 @@ export default function DealerGroupUnsigned() {
     }
   }, [configLoading, dealerConfig, selectedDealerSlug, includedDealerSlugs, rawDealerSlug, navigate]);
 
-  const displayDealerSlugs = useMemo(() => {
-    if (selectedDealerSlug) {
-      return [selectedDealerSlug];
-    }
-    return includedDealerSlugs;
-  }, [selectedDealerSlug, includedDealerSlugs]);
+  // 当前显示的dealer slug
+  const currentDealerSlug = selectedDealerSlug || includedDealerSlugs[0] || dealerSlug;
 
+  // 只展示当前选中dealer的订单
   const dealerOrders = useMemo(() => {
-    if (!dealerSlug) return [];
-    return (allOrders || []).filter((o) => {
-      const orderDealerSlug = slugifyDealerName(o.Dealer);
-      return displayDealerSlugs.includes(orderDealerSlug);
-    });
-  }, [allOrders, displayDealerSlugs, dealerSlug]);
+    if (!currentDealerSlug) return [];
+    return (allOrders || []).filter(
+      (o) => slugifyDealerName(o.Dealer) === currentDealerSlug
+    );
+  }, [allOrders, currentDealerSlug]);
 
   const unsignedOrders = useMemo(() => {
     return dealerOrders.filter((order) => {
