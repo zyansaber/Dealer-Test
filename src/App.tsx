@@ -16,6 +16,12 @@ import UnsignedEmptySlots from "./pages/UnsignedEmptySlots";
 import PasswordLogin from "./pages/PasswordLogin";
 import ProtectedMainRoute from "./components/ProtectedMainRoute";
 import ProtectedDealerRoute from "./components/ProtectedDealerRoute";
+import ProtectedDealerGroupRoute from "./components/ProtectedDealerGroupRoute";
+
+// Dealer Group pages
+import DealerGroupPortal from "./pages/DealerGroupPortal";
+import DealerGroupInventoryStock from "./pages/DealerGroupInventoryStock";
+import DealerGroupUnsigned from "./pages/DealerGroupUnsigned";
 
 const queryClient = new QueryClient();
 
@@ -62,6 +68,23 @@ const App = () => (
             <ProtectedDealerRoute>
               <DealerDashboard />
             </ProtectedDealerRoute>
+          } />
+
+          {/* Dealer Group 路由 - 新增的分组功能 */}
+          <Route path="/dealergroup/:dealerSlug/dashboard" element={
+            <ProtectedDealerGroupRoute>
+              <DealerGroupPortal />
+            </ProtectedDealerGroupRoute>
+          } />
+          <Route path="/dealergroup/:dealerSlug/inventorystock" element={
+            <ProtectedDealerGroupRoute>
+              <DealerGroupInventoryStock />
+            </ProtectedDealerGroupRoute>
+          } />
+          <Route path="/dealergroup/:dealerSlug/unsigned" element={
+            <ProtectedDealerGroupRoute>
+              <DealerGroupUnsigned />
+            </ProtectedDealerGroupRoute>
           } />
 
           {/* 受限页 */}
