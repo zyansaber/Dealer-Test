@@ -1,13 +1,14 @@
 // src/pages/DealerGroupInventoryStock.tsx
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
-import { AlertTriangle } from "lucide-react";
+import { useParams, useNavigate } from "react-router-dom";
+import { Download, AlertTriangle } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
 import Sidebar from "@/components/Sidebar";
 import OrderList from "@/components/OrderList";
+import ModelRangeCards from "@/components/ModelRangeCards";
 import {
-  subscribeToStock,
-  subscribeToReallocation,
+  subscribeToSchedule,
   subscribeToSpecPlan,
   subscribeToDateTrack,
   subscribeDealerConfig,
@@ -15,6 +16,7 @@ import {
 } from "@/lib/firebase";
 import type { ScheduleItem, SpecPlan, DateTrack } from "@/types";
 import { isDealerGroup } from "@/types/dealer";
+import * as XLSX from "xlsx";
 
 function normalizeDealerSlug(raw?: string): string {
   const slug = (raw || "").toLowerCase();
@@ -35,11 +37,14 @@ function prettifyDealerName(slug: string): string {
 }
 
 export default function DealerGroupInventoryStock() {
-  const { dealerSlug: rawDealerSlug } = useParams<{ dealerSlug: string }>();
+  const { dealerSlug: rawDealerSlug, selectedDealerSlug } = useParams<{ 
+    dealerSlug: string;
+    selectedDealerSlug?: string;
+  }>();
+  const navigate = useNavigate();
   const dealerSlug = useMemo(() => normalizeDealerSlug(rawDealerSlug), [rawDealerSlug]);
 
-  const [stockData, setStockData] = useState<any>({});
-  const [reallocationData, setReallocationData] = useState<any>({});
+  const [allOrders, setAllOrders] = useState<ScheduleItem[]>([]);
   const [specPlans, setSpecPlans] = useState<SpecPlan>({});
   const [dateTracks, setDateTracks] = useState<DateTrack>({});
   const [dealerConfig, setDealerConfig] = useState<any>(null);
@@ -47,18 +52,17 @@ export default function DealerGroupInventoryStock() {
   const [loading, setLoading] = useState(true);
   const [configLoading, setConfigLoading] = useState(true);
 
+  const [modelRangeFilter, setModelRangeFilter] = useState<{ modelRange?: string; customerType?: string }>({});
+
   useEffect(() => {
-    const unsubStock = subscribeToStock((data) => {
-      setStockData(data || {});
+    const unsubSchedule = subscribeToSchedule((data) => {
+      setAllOrders(data || []);
       setLoading(false);
     });
-    const unsubRealloc = subscribeToReallocation((data) => setReallocationData(data || {}));
     const unsubSpecPlan = subscribeToSpecPlan((data) => setSpecPlans(data || {}));
     const unsubDateTrack = subscribeToDateTrack((data) => setDateTracks(data || {}));
-
     return () => {
-      unsubStock?.();
-      unsubRealloc?.();
+      unsubSchedule?.();
       unsubSpecPlan?.();
       unsubDateTrack?.();
     };
@@ -66,12 +70,10 @@ export default function DealerGroupInventoryStock() {
 
   useEffect(() => {
     if (!dealerSlug) return;
-
     const unsubConfig = subscribeDealerConfig(dealerSlug, (config) => {
       setDealerConfig(config);
       setConfigLoading(false);
     });
-
     return unsubConfig;
   }, [dealerSlug]);
 
@@ -79,7 +81,6 @@ export default function DealerGroupInventoryStock() {
     const unsubAllConfigs = subscribeAllDealerConfigs((data) => {
       setAllDealerConfigs(data || {});
     });
-
     return unsubAllConfigs;
   }, []);
 
@@ -94,7 +95,6 @@ export default function DealerGroupInventoryStock() {
     if (!dealerConfig || !isDealerGroup(dealerConfig)) {
       return null;
     }
-    
     return includedDealerSlugs.map(slug => {
       const config = allDealerConfigs[slug];
       return {
@@ -104,38 +104,109 @@ export default function DealerGroupInventoryStock() {
     });
   }, [dealerConfig, includedDealerSlugs, allDealerConfigs]);
 
+  useEffect(() => {
+    if (!configLoading && dealerConfig && isDealerGroup(dealerConfig) && !selectedDealerSlug) {
+      const firstDealer = includedDealerSlugs[0];
+      if (firstDealer) {
+        navigate(`/dealergroup/${rawDealerSlug}/${firstDealer}/inventorystock`, { replace: true });
+      }
+    }
+  }, [configLoading, dealerConfig, selectedDealerSlug, includedDealerSlugs, rawDealerSlug, navigate]);
+
+  const displayDealerSlugs = useMemo(() => {
+    if (selectedDealerSlug) {
+      return [selectedDealerSlug];
+    }
+    return includedDealerSlugs;
+  }, [selectedDealerSlug, includedDealerSlugs]);
+
+  const dealerOrders = useMemo(() => {
+    if (!dealerSlug) return [];
+    return (allOrders || []).filter((o) => {
+      const orderDealerSlug = slugifyDealerName(o.Dealer);
+      return displayDealerSlugs.includes(orderDealerSlug);
+    });
+  }, [allOrders, displayDealerSlugs, dealerSlug]);
+
   const stockOrders = useMemo(() => {
-    const stockArr = Array.isArray(stockData)
-      ? stockData.filter(Boolean)
-      : Object.values(stockData).filter(Boolean);
+    return dealerOrders.filter((order) => 
+      (order.Customer || "").toLowerCase().endsWith("stock")
+    );
+  }, [dealerOrders]);
 
-    return stockArr.filter((item: any) => {
-      const orderDealerSlug = slugifyDealerName(item?.Dealer);
-      return includedDealerSlugs.includes(orderDealerSlug);
+  const filteredOrders = useMemo(() => {
+    return stockOrders.filter(order => {
+      if (modelRangeFilter.modelRange) {
+        const chassisPrefix = order.Chassis?.substring(0, 3).toUpperCase();
+        if (chassisPrefix !== modelRangeFilter.modelRange) return false;
+      }
+      return true;
     });
-  }, [stockData, includedDealerSlugs]);
-
-  const reallocationOrders = useMemo(() => {
-    const reallocArr = Array.isArray(reallocationData)
-      ? reallocationData.filter(Boolean)
-      : Object.values(reallocationData).filter(Boolean);
-
-    return reallocArr.filter((item: any) => {
-      const orderDealerSlug = slugifyDealerName(item?.Dealer);
-      return includedDealerSlugs.includes(orderDealerSlug);
-    });
-  }, [reallocationData, includedDealerSlugs]);
+  }, [stockOrders, modelRangeFilter]);
 
   const dealerDisplayName = useMemo(() => {
+    if (selectedDealerSlug) {
+      const selectedConfig = allDealerConfigs[selectedDealerSlug];
+      if (selectedConfig?.name) return selectedConfig.name;
+      const fromOrder = dealerOrders.find(o => slugifyDealerName(o.Dealer) === selectedDealerSlug)?.Dealer;
+      return fromOrder || prettifyDealerName(selectedDealerSlug);
+    }
     if (dealerConfig?.name) return dealerConfig.name;
-    return prettifyDealerName(dealerSlug);
-  }, [dealerConfig, dealerSlug]);
+    const fromOrder = dealerOrders[0]?.Dealer;
+    return fromOrder && fromOrder.trim().length > 0
+      ? fromOrder
+      : prettifyDealerName(dealerSlug);
+  }, [dealerConfig, dealerOrders, dealerSlug, selectedDealerSlug, allDealerConfigs]);
 
   const hasAccess = useMemo(() => {
     if (configLoading) return true;
     if (!dealerConfig) return false;
     return dealerConfig.isActive;
   }, [dealerConfig, configLoading]);
+
+  const exportToExcel = () => {
+    if (filteredOrders.length === 0) return;
+    const excelData = filteredOrders.map((order) => {
+      const dateTrack =
+        (dateTracks as any)[order.Chassis] ||
+        (Object.values(dateTracks) as any[]).find(
+          (dt: any) => dt?.["Chassis Number"] === order.Chassis
+        );
+      return {
+        Chassis: order.Chassis,
+        Customer: order.Customer,
+        Model: order.Model,
+        "Model Year": order["Model Year"],
+        Dealer: order.Dealer,
+        "Forecast Production Date": order["Forecast Production Date"],
+        "Order Received Date": order["Order Received Date"] || "",
+        "Signed Plans Received": order["Signed Plans Received"] || "",
+        "Purchase Order Sent": order["Purchase Order Sent"] || "",
+        "Price Date": order["Price Date"] || "",
+        "Request Delivery Date": order["Request Delivery Date"] || "",
+        "Regent Production": order["Regent Production"] || "",
+        Shipment: (order as any).Shipment || "",
+        "Left Port": (dateTrack || {})["Left Port"] || "",
+        "Received in Melbourne": (dateTrack || {})["Received in Melbourne"] || "",
+        "Dispatched from Factory": (dateTrack || {})["Dispatched from Factory"] || "",
+      };
+    });
+
+    try {
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(excelData);
+      const colWidths = Object.keys(excelData[0] || {}).map((key) => ({
+        wch: Math.max(key.length, 15),
+      }));
+      (ws as any)["!cols"] = colWidths;
+      const date = new Date().toISOString().split("T")[0];
+      const filename = `${dealerDisplayName}_Stock_${date}.xlsx`;
+      XLSX.utils.book_append_sheet(wb, ws, "Stock");
+      XLSX.writeFile(wb, filename);
+    } catch (err) {
+      console.error("Export excel failed:", err);
+    }
+  };
 
   if (!configLoading && !hasAccess) {
     return (
@@ -158,7 +229,7 @@ export default function DealerGroupInventoryStock() {
   if (loading || configLoading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="text-slate-600">Loading inventory...</div>
+        <div className="text-slate-600">Loading...</div>
       </div>
     );
   }
@@ -166,7 +237,7 @@ export default function DealerGroupInventoryStock() {
   return (
     <div className="flex min-h-screen">
       <Sidebar
-        orders={[...stockOrders, ...reallocationOrders]}
+        orders={filteredOrders}
         selectedDealer={dealerDisplayName}
         onDealerSelect={() => {}}
         hideOtherDealers={true}
@@ -177,31 +248,40 @@ export default function DealerGroupInventoryStock() {
       />
 
       <main className="flex-1 p-6 space-y-6">
-        <header>
-          <h1 className="text-2xl font-semibold">Factory Inventory — {dealerDisplayName}</h1>
-          <p className="text-muted-foreground mt-1">
-            Stock and reallocation orders
-          </p>
+        <header className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold">
+              Factory Inventory — {dealerDisplayName}
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              Stock Vehicles ({filteredOrders.length} of {stockOrders.length} vehicles)
+            </p>
+          </div>
+          <Button
+            onClick={exportToExcel}
+            disabled={filteredOrders.length === 0}
+            className="bg-green-600 hover:bg-green-700"
+          >
+            <Download className="w-4 h-4 mr-2" />
+            Export Excel
+          </Button>
         </header>
 
-        {stockOrders.length === 0 && reallocationOrders.length === 0 ? (
-          <div className="text-muted-foreground">No inventory orders found.</div>
-        ) : (
-          <>
-            {stockOrders.length > 0 && (
-              <div className="space-y-4">
-                <h2 className="text-xl font-semibold">Stock Orders ({stockOrders.length})</h2>
-                <OrderList orders={stockOrders} specPlans={specPlans} dateTracks={dateTracks} />
-              </div>
-            )}
+        <ModelRangeCards 
+          orders={stockOrders} 
+          onFilterChange={setModelRangeFilter}
+        />
 
-            {reallocationOrders.length > 0 && (
-              <div className="space-y-4">
-                <h2 className="text-xl font-semibold">Reallocation Orders ({reallocationOrders.length})</h2>
-                <OrderList orders={reallocationOrders} specPlans={specPlans} dateTracks={dateTracks} />
-              </div>
+        {filteredOrders.length === 0 ? (
+          <div className="text-muted-foreground">
+            {stockOrders.length === 0 ? (
+              <>No stock vehicles found for <span className="font-medium">{dealerDisplayName}</span>.</>
+            ) : (
+              <>No stock vehicles match your current filters.</>
             )}
-          </>
+          </div>
+        ) : (
+          <OrderList orders={filteredOrders} specPlans={specPlans} dateTracks={dateTracks} />
         )}
       </main>
     </div>
