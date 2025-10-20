@@ -1,6 +1,6 @@
 // src/pages/DealerGroupPortal.tsx
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { Download, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
@@ -41,7 +41,11 @@ function prettifyDealerName(slug: string): string {
 }
 
 export default function DealerGroupPortal() {
-  const { dealerSlug: rawDealerSlug } = useParams<{ dealerSlug: string }>();
+  const { dealerSlug: rawDealerSlug, selectedDealerSlug } = useParams<{ 
+    dealerSlug: string;
+    selectedDealerSlug?: string;
+  }>();
+  const navigate = useNavigate();
   const dealerSlug = useMemo(() => normalizeDealerSlug(rawDealerSlug), [rawDealerSlug]);
 
   const [allOrders, setAllOrders] = useState<ScheduleItem[]>([]);
@@ -114,15 +118,33 @@ export default function DealerGroupPortal() {
     });
   }, [dealerConfig, includedDealerSlugs, allDealerConfigs]);
 
-  // 过滤订单：包含所有相关dealer的订单
+  // 如果是分组且没有选中dealer，自动重定向到第一个dealer
+  useEffect(() => {
+    if (!configLoading && dealerConfig && isDealerGroup(dealerConfig) && !selectedDealerSlug) {
+      const firstDealer = includedDealerSlugs[0];
+      if (firstDealer) {
+        navigate(`/dealergroup/${rawDealerSlug}/${firstDealer}/dashboard`, { replace: true });
+      }
+    }
+  }, [configLoading, dealerConfig, selectedDealerSlug, includedDealerSlugs, rawDealerSlug, navigate]);
+
+  // 当前显示的dealer slugs（如果选中了特定dealer，只显示该dealer）
+  const displayDealerSlugs = useMemo(() => {
+    if (selectedDealerSlug) {
+      return [selectedDealerSlug];
+    }
+    return includedDealerSlugs;
+  }, [selectedDealerSlug, includedDealerSlugs]);
+
+  // 过滤订单：只显示当前选中dealer的订单
   const dealerOrders = useMemo(() => {
     if (!dealerSlug) return [];
     
     return (allOrders || []).filter((o) => {
       const orderDealerSlug = slugifyDealerName(o.Dealer);
-      return includedDealerSlugs.includes(orderDealerSlug);
+      return displayDealerSlugs.includes(orderDealerSlug);
     });
-  }, [allOrders, includedDealerSlugs, dealerSlug]);
+  }, [allOrders, displayDealerSlugs, dealerSlug]);
 
   // 过滤订单（仅 Model Range / Customer Type）
   const filteredOrders = useMemo(() => {
@@ -146,13 +168,23 @@ export default function DealerGroupPortal() {
 
   // 展示用的 Dealer 名称
   const dealerDisplayName = useMemo(() => {
+    // 如果选中了特定dealer，显示该dealer的名称
+    if (selectedDealerSlug) {
+      const selectedConfig = allDealerConfigs[selectedDealerSlug];
+      if (selectedConfig?.name) return selectedConfig.name;
+      
+      const fromOrder = dealerOrders.find(o => slugifyDealerName(o.Dealer) === selectedDealerSlug)?.Dealer;
+      return fromOrder || prettifyDealerName(selectedDealerSlug);
+    }
+
+    // 否则显示分组名称
     if (dealerConfig?.name) return dealerConfig.name;
 
     const fromOrder = dealerOrders[0]?.Dealer;
     return fromOrder && fromOrder.trim().length > 0
       ? fromOrder
       : prettifyDealerName(dealerSlug);
-  }, [dealerConfig, dealerOrders, dealerSlug]);
+  }, [dealerConfig, dealerOrders, dealerSlug, selectedDealerSlug, allDealerConfigs]);
 
   // 检查访问权限
   const hasAccess = useMemo(() => {
