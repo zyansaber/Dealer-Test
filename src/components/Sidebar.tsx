@@ -59,31 +59,42 @@ export default function Sidebar({
     return selectedDealer || "Dealer Portal";
   }, [selectedDealer, hideOtherDealers, currentDealerName]);
 
-  // 获取当前页面类型（dashboard, inventorystock, unsigned）
+  // 获取当前页面类型（dashboard, dealerorders, inventorystock, unsigned）
   const getCurrentPage = () => {
     const path = location.pathname;
     if (path.includes('/inventorystock')) return 'inventorystock';
     if (path.includes('/unsigned')) return 'unsigned';
+    if (path.includes('/dealerorders')) return 'dealerorders';
     if (path.includes('/dashboard')) return 'dashboard';
-    return 'dashboard';
+    return 'dealerorders';
   };
 
   // 处理dealer点击 - 切换到选中的dealer并保持当前页面
   const handleDealerClick = (newDealerSlug: string) => {
     const currentPage = getCurrentPage();
-    navigate(`/dealergroup/${dealerSlug}/${newDealerSlug}/${currentPage}`);
+    if (isGroup) {
+      navigate(`/dealergroup/${dealerSlug}/${newDealerSlug}/${currentPage}`);
+    } else {
+      navigate(`/dealer/${newDealerSlug}/${currentPage}`);
+    }
   };
 
-  // 导航路径 - 使用新的路由结构
-  const basePath = dealerSlug && selectedDealerSlug 
-    ? `/dealergroup/${dealerSlug}/${selectedDealerSlug}` 
-    : dealerSlug 
-    ? `/dealergroup/${dealerSlug}` 
-    : "/";
+  // 导航路径 - 根据是否是group使用不同的前缀
+  const basePath = useMemo(() => {
+    if (isGroup) {
+      return dealerSlug && selectedDealerSlug 
+        ? `/dealergroup/${dealerSlug}/${selectedDealerSlug}` 
+        : dealerSlug 
+        ? `/dealergroup/${dealerSlug}` 
+        : "/";
+    } else {
+      return dealerSlug ? `/dealer/${dealerSlug}` : "/";
+    }
+  }, [isGroup, dealerSlug, selectedDealerSlug]);
     
   const navigationItems = [
     { path: `${basePath}/dashboard`, label: "Dashboard", icon: LayoutDashboard, end: true },
-    { path: `${basePath}/dashboard`, label: "Dealer Orders", icon: BarChart3, end: true },
+    { path: isGroup ? `${basePath}/dealerorders` : basePath, label: "Dealer Orders", icon: BarChart3, end: !isGroup },
     { path: `${basePath}/inventorystock`, label: "Factory Inventory", icon: Factory, end: true },
     { path: `${basePath}/unsigned`, label: "Unsigned & Empty Slots", icon: FileX, end: true },
   ];
