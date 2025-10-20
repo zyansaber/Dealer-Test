@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { Package, BarChart3, Factory, FileX } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { NavLink, useParams } from "react-router-dom";
+import { NavLink, useParams, useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import type { ScheduleItem } from "@/types";
 
@@ -31,7 +31,9 @@ export default function Sidebar({
   isGroup = false,
   includedDealers = null
 }: SidebarProps) {
-  const { dealerSlug } = useParams<{ dealerSlug: string }>();
+  const { dealerSlug, selectedDealerSlug } = useParams<{ dealerSlug: string; selectedDealerSlug?: string }>();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   // 计算基础统计数据（仅保留总订单数/stock/customer）
   const stats = useMemo(() => {
@@ -57,8 +59,27 @@ export default function Sidebar({
     return selectedDealer || "Dealer Portal";
   }, [selectedDealer, hideOtherDealers, currentDealerName]);
 
-  // 导航路径 - 使用 dealergroup 路径
-  const basePath = dealerSlug ? `/dealergroup/${dealerSlug}` : "/";
+  // 获取当前页面类型（dashboard, inventorystock, unsigned）
+  const getCurrentPage = () => {
+    const path = location.pathname;
+    if (path.includes('/inventorystock')) return 'inventorystock';
+    if (path.includes('/unsigned')) return 'unsigned';
+    return 'dashboard';
+  };
+
+  // 处理dealer点击 - 切换到选中的dealer并保持当前页面
+  const handleDealerClick = (dealerSlug: string) => {
+    const currentPage = getCurrentPage();
+    navigate(`/dealergroup/${dealerSlug}/${dealerSlug}/${currentPage}`);
+  };
+
+  // 导航路径 - 使用新的路由结构
+  const basePath = dealerSlug && selectedDealerSlug 
+    ? `/dealergroup/${dealerSlug}/${selectedDealerSlug}` 
+    : dealerSlug 
+    ? `/dealergroup/${dealerSlug}` 
+    : "/";
+    
   const navigationItems = [
     { path: `${basePath}/dashboard`, label: "Dealer Orders", icon: BarChart3, end: true },
     { path: `${basePath}/inventorystock`, label: "Factory Inventory", icon: Factory, end: true },
@@ -107,30 +128,48 @@ export default function Sidebar({
       {hideOtherDealers && (
         <div className="p-4 border-b border-slate-200">
           <h3 className="text-sm font-medium text-slate-700 mb-3">Current Dealer</h3>
-          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg space-y-2">
-            <div className="font-medium text-blue-900">{displayDealerName}</div>
-            <div className="text-sm text-blue-700">
-              {isGroup ? "Dealer Group" : "Dealer Portal"}
+          
+          {/* 如果是分组，显示包含的dealers作为可点击的卡片 */}
+          {isGroup && includedDealers && includedDealers.length > 0 ? (
+            <div className="space-y-2">
+              {includedDealers.map((dealer) => {
+                const isSelected = selectedDealerSlug === dealer.slug;
+                return (
+                  <button
+                    key={dealer.slug}
+                    onClick={() => handleDealerClick(dealer.slug)}
+                    className={`w-full p-3 rounded-lg border-2 transition-all text-left ${
+                      isSelected
+                        ? 'bg-blue-50 border-blue-500 shadow-sm'
+                        : 'bg-white border-slate-200 hover:border-blue-300 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className={`font-medium ${isSelected ? 'text-blue-900' : 'text-slate-900'}`}>
+                          {dealer.name}
+                        </div>
+                        <div className={`text-xs mt-1 ${isSelected ? 'text-blue-700' : 'text-slate-500'}`}>
+                          Dealer Portal
+                        </div>
+                      </div>
+                      {isSelected && (
+                        <Badge variant="default" className="bg-blue-600">
+                          Active
+                        </Badge>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
-            
-            {/* 如果是分组，显示包含的dealers */}
-            {isGroup && includedDealers && includedDealers.length > 0 && (
-              <div className="mt-3 pt-3 border-t border-blue-200">
-                <div className="text-xs font-medium text-blue-800 mb-2">Includes:</div>
-                <div className="flex flex-wrap gap-1">
-                  {includedDealers.map((dealer) => (
-                    <Badge 
-                      key={dealer.slug} 
-                      variant="secondary"
-                      className="text-xs bg-blue-100 text-blue-800 border-blue-300"
-                    >
-                      {dealer.name}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
+          ) : (
+            // 单个dealer显示
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg space-y-2">
+              <div className="font-medium text-blue-900">{displayDealerName}</div>
+              <div className="text-sm text-blue-700">Dealer Portal</div>
+            </div>
+          )}
         </div>
       )}
 
