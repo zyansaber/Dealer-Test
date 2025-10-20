@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { Package, BarChart3, Factory, FileX } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { NavLink, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import type { ScheduleItem } from "@/types";
@@ -12,6 +13,8 @@ interface SidebarProps {
   hideOtherDealers?: boolean;
   currentDealerName?: string;
   showStats?: boolean;
+  isGroup?: boolean;
+  includedDealers?: Array<{ slug: string; name: string }> | null;
 }
 
 /** ---- 安全工具函数：统一兜底，避免 undefined.toLowerCase 报错 ---- */
@@ -24,7 +27,9 @@ export default function Sidebar({
   onDealerSelect,
   hideOtherDealers = false,
   currentDealerName,
-  showStats = true
+  showStats = true,
+  isGroup = false,
+  includedDealers = null
 }: SidebarProps) {
   const { dealerSlug } = useParams<{ dealerSlug: string }>();
 
@@ -52,13 +57,12 @@ export default function Sidebar({
     return selectedDealer || "Dealer Portal";
   }, [selectedDealer, hideOtherDealers, currentDealerName]);
 
-  // 导航路径
-  const basePath = dealerSlug ? `/dealer/${dealerSlug}` : "/";
+  // 导航路径 - 使用 dealergroup 路径
+  const basePath = dealerSlug ? `/dealergroup/${dealerSlug}` : "/";
   const navigationItems = [
-    { path: basePath, label: "Dealer Orders", icon: BarChart3, end: true },
+    { path: `${basePath}/dashboard`, label: "Dealer Orders", icon: BarChart3, end: true },
     { path: `${basePath}/inventorystock`, label: "Factory Inventory", icon: Factory, end: true },
     { path: `${basePath}/unsigned`, label: "Unsigned & Empty Slots", icon: FileX, end: true },
-    { path: `${basePath}/dashboard`, label: "Dashboard", icon: Package, end: true }
   ];
 
   return (
@@ -99,13 +103,33 @@ export default function Sidebar({
         </div>
       )}
 
-      {/* Current Context Display - 在隐藏模式下显示当前dealer */}
+      {/* Current Context Display - 显示当前dealer或分组信息 */}
       {hideOtherDealers && (
         <div className="p-4 border-b border-slate-200">
           <h3 className="text-sm font-medium text-slate-700 mb-3">Current Dealer</h3>
-          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg space-y-2">
             <div className="font-medium text-blue-900">{displayDealerName}</div>
-            <div className="text-sm text-blue-700">Dealer Portal</div>
+            <div className="text-sm text-blue-700">
+              {isGroup ? "Dealer Group" : "Dealer Portal"}
+            </div>
+            
+            {/* 如果是分组，显示包含的dealers */}
+            {isGroup && includedDealers && includedDealers.length > 0 && (
+              <div className="mt-3 pt-3 border-t border-blue-200">
+                <div className="text-xs font-medium text-blue-800 mb-2">Includes:</div>
+                <div className="flex flex-wrap gap-1">
+                  {includedDealers.map((dealer) => (
+                    <Badge 
+                      key={dealer.slug} 
+                      variant="secondary"
+                      className="text-xs bg-blue-100 text-blue-800 border-blue-300"
+                    >
+                      {dealer.name}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
