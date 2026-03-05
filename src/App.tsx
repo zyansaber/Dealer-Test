@@ -17,7 +17,6 @@ import PasswordLogin from "./pages/PasswordLogin";
 import ProtectedMainRoute from "./components/ProtectedMainRoute";
 import ProtectedDealerRoute from "./components/ProtectedDealerRoute";
 import ProtectedDealerGroupRoute from "./components/ProtectedDealerGroupRoute";
-import PlanningIntegration from "./pages/PlanningIntegration";
 
 // Dealer Group pages
 import DealerGroupPortal from "./pages/DealerGroupPortal";
@@ -46,12 +45,6 @@ const App = () => (
             </ProtectedMainRoute>
           } />
           
-          <Route path="/planningintegration" element={
-            <ProtectedMainRoute>
-              <PlanningIntegration />
-            </ProtectedMainRoute>
-          } />
-
           {/* 管理员相关路由 */}
           <Route path="/admin-login" element={<AdminLogin />} />
           <Route path="/admin" element={<Admin />} />
